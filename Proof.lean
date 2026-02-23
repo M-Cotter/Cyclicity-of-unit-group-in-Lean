@@ -1,6 +1,6 @@
 import Mathlib
 
--- It may not be computable since we use choice implicitly in some library functions
+-- Not computable since we use choice implicitly in some library functions
 
 noncomputable section
 
@@ -17,7 +17,8 @@ theorem ZMod_bound_solns (p : ℕ) (d : ℕ) (dpos : d > 0) [Fact p.Prime] :
         classical
         refine Nat.card_le_card_of_injective
           (fun i ↦ ⟨(i.1 : ZMod p),
-          by rcases i with ⟨val, h⟩; simp? at h; exact (mem_rootsOfUnity' d val).mp h⟩)
+          by rcases i with ⟨val, h⟩; simp only [Set.mem_setOf_eq] at h;
+              exact (mem_rootsOfUnity' d val).mp h⟩)
           ?_
         intro i j h
         ext
@@ -31,16 +32,21 @@ theorem ZMod_bound_solns (p : ℕ) (d : ℕ) (dpos : d > 0) [Fact p.Prime] :
         congr
         ext x
         constructor
-        intro xd
-        · apply Multiset.mem_toFinset.mp
-          · simp
-            constructor
-            · rw [sub_eq_add_neg, add_eq_zero_iff_eq_neg, neg_neg]
-              refine (Polynomial.Monic.natDegree_pos ?_).mp ?_
-              · exact Polynomial.monic_X_pow d
-              · simp
-                exact dpos
-            · exact xd
+        · intro xd
+          · apply Multiset.mem_toFinset.mp
+            · simp only [Multiset.toFinset_val, Multiset.mem_toFinset,
+                Multiset.mem_dedup, Polynomial.mem_roots',
+                Algebra.algebraMap_self, Polynomial.map_sub,
+                Polynomial.map_pow, Polynomial.map_X, Polynomial.map_one, ne_eq,
+                Polynomial.IsRoot.def, Polynomial.eval_sub,
+                Polynomial.eval_pow, Polynomial.eval_X, Polynomial.eval_one]
+              constructor
+              · rw [sub_eq_add_neg, add_eq_zero_iff_eq_neg, neg_neg]
+                refine (Polynomial.Monic.natDegree_pos ?_).mp ?_
+                · exact Polynomial.monic_X_pow d
+                · simp only [Polynomial.natDegree_pow, Polynomial.natDegree_X, mul_one]
+                  exact dpos
+              · exact xd
         · intro xd
           apply Multiset.mem_toFinset.mpr at xd
           simp at xd
@@ -49,7 +55,8 @@ theorem ZMod_bound_solns (p : ℕ) (d : ℕ) (dpos : d > 0) [Fact p.Prime] :
         apply Polynomial.ncard_rootSet_le
       _ = (Polynomial.X ^ d).natDegree := by
         apply Polynomial.natDegree_sub_eq_left_of_natDegree_lt
-        simp
+        simp only [Polynomial.natDegree_one,
+          Polynomial.natDegree_pow, Polynomial.natDegree_X, mul_one]
         exact dpos
       _ = d := by
         exact Polynomial.natDegree_X_pow d
@@ -62,25 +69,25 @@ theorem ZMod_bound_solns (p : ℕ) (d : ℕ) (dpos : d > 0) [Fact p.Prime] :
 theorem cyclic_prime_unit {p : ℕ} [Fact p.Prime] : IsCyclic (ZMod p)ˣ := by
   apply IsCyclic.of_exponent_eq_card
   apply le_antisymm
-  apply Nat.le_of_dvd
-  · apply Nat.card_pos
-  · apply Group.exponent_dvd_nat_card
-  by_contra
-  simp at this
-  let d := Monoid.exponent (ZMod p)ˣ
-  have : Nat.card (ZMod p)ˣ ≤ d := by
-    calc
-      Nat.card (ZMod p)ˣ = Nat.card {i : (ZMod p)ˣ | i ^ d = 1} := by
-        rw [Nat.card_eq_fintype_card, ← Fintype.card_setUniv, ← Nat.card_eq_fintype_card]
-        congr
-        ext x
-        simp only [Set.mem_univ, Set.mem_setOf_eq, true_iff]
-        exact Monoid.pow_exponent_eq_one x
-      Nat.card {i : (ZMod p)ˣ | i ^ d = 1} ≤ d := by
-        apply ZMod_bound_solns
-        apply Monoid.exponent_pos.mpr Monoid.ExponentExists.of_finite
-  simp at *
-  linarith
+  · apply Nat.le_of_dvd
+    · apply Nat.card_pos
+    · apply Group.exponent_dvd_nat_card
+  · by_contra
+    simp only [Nat.card_eq_fintype_card, ZMod.card_units_eq_totient, not_le] at this
+    let d := Monoid.exponent (ZMod p)ˣ
+    have : Nat.card (ZMod p)ˣ ≤ d := by
+      calc
+        Nat.card (ZMod p)ˣ = Nat.card {i : (ZMod p)ˣ | i ^ d = 1} := by
+          rw [Nat.card_eq_fintype_card, ← Fintype.card_setUniv, ← Nat.card_eq_fintype_card]
+          congr
+          ext x
+          simp only [Set.mem_univ, Set.mem_setOf_eq, true_iff]
+          exact Monoid.pow_exponent_eq_one x
+        Nat.card {i : (ZMod p)ˣ | i ^ d = 1} ≤ d := by
+          apply ZMod_bound_solns
+          apply Monoid.exponent_pos.mpr Monoid.ExponentExists.of_finite
+    simp at *
+    linarith
 
 set_option linter.style.induction false
 
@@ -123,7 +130,7 @@ theorem cyclic_prime_power_unit
       exact lt_add_one (k + 1)
     have : g.1.val.Coprime p := by
       rw [← Nat.coprime_pow_right_iff (by change k + 1 > 0; norm_num), ← ZMod.isUnit_iff_coprime]
-      simp
+      simp only [ZMod.natCast_val, ZMod.cast_id', id_eq, Units.isUnit]
     have hUnit : IsUnit (h.val : ZMod (p ^ (k + 1 + 1))) := by
       rw [ZMod.isUnit_iff_coprime, Nat.coprime_pow_right_iff, hvalegval]
       · apply this
@@ -141,20 +148,20 @@ theorem cyclic_prime_power_unit
       exact this
     have orderOfi : orderOf i = (p ^ (k + 1)).totient := by
       rw [orderOf_pow', orderOfh]
-      simp only [Nat.gcd_mul_left_left]
-      rw [Nat.mul_div_cancel]
-      exact npos
-      exact Nat.ne_zero_of_lt npos
+      · simp only [Nat.gcd_mul_left_left]
+        rw [Nat.mul_div_cancel]
+        exact npos
+      · exact Nat.ne_zero_of_lt npos
     -- Compute the order of i ^ (p ^ k)
     have orderOfipow : orderOf (i ^ (p ^ k)) = p - 1 := by
       rw [orderOf_pow']
-      rw [orderOfi, Nat.totient_prime_pow]
-      simp
-      rw [Nat.mul_div_cancel_left]
-      apply pow_pos
-      exact Nat.pos_of_neZero p
-      exact Fact.out
-      exact Nat.zero_lt_succ k
+      · rw [orderOfi, Nat.totient_prime_pow]
+        · simp only [add_tsub_cancel_right, Nat.gcd_mul_right_left]
+          rw [Nat.mul_div_cancel_left]
+          apply pow_pos
+          exact Nat.pos_of_neZero p
+        · exact Fact.out
+        · exact Nat.zero_lt_succ k
       exact Ne.symm (NeZero.ne' (p ^ k))
     -- Compute the order of 1 + p
     let onep := ((1 + p) : ZMod (p ^ (k + 1 + 1)))
@@ -167,23 +174,24 @@ theorem cyclic_prime_power_unit
             rw [← orderOfipow]
             rw [ZMod.orderOf_one_add_prime Fact.out pneqtwo]
             rw [mul_comm]
-            simp
+            simp [add_tsub_cancel_right]
           _ = orderOf (i ^ (p ^ k) * onep : ZMod (p ^ (k + 1 + 1))) := by
             symm
             apply Commute.orderOf_mul_eq_mul_orderOf_of_coprime
-            apply Commute.all
-            rw [orderOfipow, ZMod.orderOf_one_add_prime Fact.out pneqtwo]
-            simp
-            rw [Nat.coprime_comm]
-            apply Nat.coprime_of_lt_prime
-            apply ne_of_gt
-            rw [Nat.lt_sub_iff_add_lt, zero_add]
-            apply Nat.Prime.one_lt Fact.out
-            simp
-            apply lt_trans
-            show 0 < 1; norm_num
-            apply Nat.Prime.one_lt Fact.out
-            exact Fact.out
+            · apply Commute.all
+            · rw [orderOfipow, ZMod.orderOf_one_add_prime Fact.out pneqtwo]
+              simp only [lt_add_iff_pos_left,
+                Order.lt_add_one_iff, zero_le, Nat.coprime_pow_right_iff]
+              rw [Nat.coprime_comm]
+              apply Nat.coprime_of_lt_prime
+              · apply ne_of_gt
+                rw [Nat.lt_sub_iff_add_lt, zero_add]
+                apply Nat.Prime.one_lt Fact.out
+              · simp only [tsub_lt_self_iff, zero_lt_one, and_true]
+                apply lt_trans
+                · change 0 < 1; norm_num
+                · apply Nat.Prime.one_lt Fact.out
+              exact Fact.out
     -- Compute the order of i ^ (p ^ k) * onep
     let ipowmul := i ^ (p ^ k) * onep
     have ipowmul_unit : IsUnit ipowmul := by
@@ -192,10 +200,10 @@ theorem cyclic_prime_power_unit
       nth_rw 1 [← pow_one ipowmul]
       have : 1 ≤ p ^ (k + 1) * (p - 1) := by
         apply Nat.le_iff_lt_add_one.mpr
-        simp
+        simp only [lt_add_iff_pos_left, CanonicallyOrderedAdd.mul_pos, tsub_pos_iff_lt]
         constructor
-        apply pow_pos (Nat.Prime.pos Fact.out)
-        apply Nat.Prime.one_lt Fact.out
+        · apply pow_pos (Nat.Prime.pos Fact.out)
+        · apply Nat.Prime.one_lt Fact.out
       rw [← pow_add, ← Nat.add_sub_assoc this, add_comm 1, Nat.add_sub_assoc (by simp)]
       simp only [tsub_self, add_zero]
       rw [← orderOfmulipow, pow_orderOf_eq_one]
@@ -204,8 +212,8 @@ theorem cyclic_prime_power_unit
     rw [← orderOf_units]
     simp only [IsUnit.unit_spec, Nat.card_eq_fintype_card, ZMod.card_units_eq_totient]
     rw [orderOfmulipow, Nat.totient_prime_pow, Nat.add_sub_assoc (le_refl _)]
-    exact Fact.out
-    exact Nat.lt_add_of_pos_left (by expose_names; exact Nat.lt_add_of_pos_left npos_1)
+    · exact Fact.out
+    · exact Nat.lt_add_of_pos_left (by expose_names; exact Nat.lt_add_of_pos_left npos_1)
 
 -- Unit group of an odd natural cross the unit group of two and its double are isomorphic
 -- Simple application of CRT
@@ -227,15 +235,14 @@ def unit_two_times_odd_unit_iso (n : ℕ) (nodd : Odd n) :
 
 -- Unit group of two times a prime power is cyclic, uses isomorphism shown previously
 theorem cyclic_two_prime_power_unit
-    (p : ℕ) (n : ℕ) [Fact p.Prime] (podd : Odd p) (npos : n > 0) :
+    (p : ℕ) (n : ℕ) [Fact p.Prime] (pneqtwo : p ≠ 2) (npos : n > 0) :
   IsCyclic (ZMod (2 * (p ^ n)))ˣ := by
   have : (ZMod (2 * (p ^ n)))ˣ ≃* (ZMod (p ^ n))ˣ := by
     apply unit_two_times_odd_unit_iso
-    apply (Nat.odd_pow_iff (Nat.ne_zero_of_lt npos)).mpr podd
+    apply (Nat.odd_pow_iff (Nat.ne_zero_of_lt npos)).mpr
+    apply Nat.Prime.odd_of_ne_two Fact.out pneqtwo
   apply (MulEquiv.isCyclic this).mpr
-  apply cyclic_prime_power_unit
-  intro p2
-  apply Nat.not_even_iff_odd.mpr podd; use 1; apply npos
+  apply cyclic_prime_power_unit _ _ pneqtwo npos
 
 /- Auxiliary theorem stating that if a divides b then either a divides 2b or a + b
 divides b ℤ/2ℤ. Classical application of modular arithmetic.
@@ -243,26 +250,26 @@ divides b ℤ/2ℤ. Classical application of modular arithmetic.
 theorem aux (n k : ℤ) (kpos : 0 < k) (nmodk : n % k = 0) : n % (2 * k) = 0 ∨ n % (2 * k) = k := by
   rcases (Int.dvd_of_emod_eq_zero nmodk) with ⟨x, hx⟩
   by_cases xodd : Odd x
-  rcases xodd with ⟨y, hy⟩
-  right
-  rw [hx, hy, mul_add, ← mul_assoc, mul_comm 2]
-  simp
-  rw [Int.emod_eq_of_lt]
-  exact Int.le_of_lt kpos
-  nth_rw 1 [← mul_one k]
-  apply Int.mul_lt_mul' (le_refl _) (by norm_num) (by norm_num) kpos
-  rw [Int.not_odd_iff_even] at xodd
-  left
-  rcases xodd with ⟨y, hy⟩
-  simp
-  use y
-  rw [mul_comm 2, mul_assoc, two_mul, ← hy, hx]
+  · rcases xodd with ⟨y, hy⟩
+    right
+    rw [hx, hy, mul_add, ← mul_assoc, mul_comm 2]
+    simp only [mul_one, Int.mul_add_emod_self_left]
+    rw [Int.emod_eq_of_lt]
+    · exact Int.le_of_lt kpos
+    · nth_rw 1 [← mul_one k]
+      apply Int.mul_lt_mul' (le_refl _) (by norm_num) (by norm_num) kpos
+  · rw [Int.not_odd_iff_even] at xodd
+    left
+    rcases xodd with ⟨y, hy⟩
+    apply EuclideanDomain.mod_eq_zero.mpr
+    use y
+    rw [mul_comm 2, mul_assoc, two_mul, ← hy, hx]
 
 
--- Any group with two elements that square of equal 1 is not cyclic
-theorem two_not_cyclic {G : Type} [Group G] [Finite G] (x y : G)
+-- Any group with two square elements is not cyclic
+theorem two_squares_not_cyclic {G : Type} [Group G] [Finite G] (x y : G)
   (xorder : orderOf x = 2) (yorder : orderOf y = 2)
-  (xney : x ≠ y): ¬(IsCyclic G) := by
+  (xney : x ≠ y) : ¬(IsCyclic G) := by
   intro GCyc
   -- Some easy haves for cleanliness
   have xneo : x ≠ 1 := by
@@ -278,7 +285,7 @@ theorem two_not_cyclic {G : Type} [Group G] [Finite G] (x y : G)
   have xsq : x ^ (2 : ℤ) = 1 := by rw [zpow_ofNat, ← xorder, pow_orderOf_eq_one]
   have ysq : y ^ (2 : ℤ) = 1 := by rw [zpow_ofNat, ← yorder, pow_orderOf_eq_one]
   rcases GCyc with ⟨g, hg⟩
-  simp [Function.Surjective] at hg
+  rw [Function.Surjective] at hg
   rcases hg x with ⟨xn, hx⟩
   rcases hg y with ⟨yn, hy⟩
   have : orderOf g = Nat.card G := by
@@ -286,59 +293,140 @@ theorem two_not_cyclic {G : Type} [Group G] [Finite G] (x y : G)
   let k := orderOf g
   -- Split by cases on whether the order of g is odd
   by_cases kOdd : Odd (k : ℤ)
-  have xn_eq_o_mod_k : xn % k = 0 := by
-    apply Int.emod_eq_zero_of_dvd
-    apply Int.dvd_of_dvd_mul_right_of_gcd_one
-    apply orderOf_dvd_iff_zpow_eq_one.mpr
-    rw [mul_comm, zpow_mul, hx, xsq]
-    rw [Int.odd_iff] at kOdd
-    rw [← Int.gcd_emod, kOdd]
-    simp
-  apply xneo
-  rw [← hx, ← zpow_mod_orderOf, xn_eq_o_mod_k, zpow_zero]
-  rw [Int.not_odd_iff] at kOdd
-  have half_k_pos : 0 < (k : ℤ) / 2 := by
-    rw [← Int.even_iff] at kOdd
-    rcases kOdd with ⟨y, hy⟩
-    rw [hy, ← Int.two_mul, Int.mul_ediv_cancel_left]
-    apply (mul_pos_iff_of_pos_left (by change 0 < 2; norm_num)).mp
-    rw [two_mul, ← hy]
-    simp
-    apply orderOf_pos
-    norm_num
-  -- We use the auxiliary lemma to get a condition on x and y to operate on later
-  have x_cond : xn % k = 0 ∨ xn % k = k / 2 := by
-    nth_rw 1 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
-    nth_rw 2 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
-    rw [mul_comm _ 2]
-    apply aux
-    apply half_k_pos
-    simp
-    rw [← Int.mul_dvd_mul_iff_left (by show 2 ≠ 0; norm_num)]
-    rw [mul_comm, Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
-    apply orderOf_dvd_iff_zpow_eq_one.mpr
-    rw [mul_comm, zpow_mul, hx, xsq]
-  have y_cond : yn % k = 0 ∨ yn % k = k / 2 := by
-    nth_rw 1 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
-    nth_rw 2 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
-    rw [mul_comm _ 2]
-    apply aux
-    apply half_k_pos
-    simp
-    rw [← Int.mul_dvd_mul_iff_left (by show 2 ≠ 0; norm_num)]
-    rw [mul_comm, Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
-    apply orderOf_dvd_iff_zpow_eq_one.mpr
-    rw [mul_comm, zpow_mul, hy, ysq]
-  -- Final stretch where we arrive at contradictions, by cases on the previous conditions
-  cases x_cond with
-  | inl x_z =>
+  · have xn_eq_o_mod_k : xn % k = 0 := by
+      apply Int.emod_eq_zero_of_dvd
+      apply Int.dvd_of_dvd_mul_right_of_gcd_one
+      · apply orderOf_dvd_iff_zpow_eq_one.mpr
+        rw [mul_comm, zpow_mul, hx, xsq]
+      · rw [Int.odd_iff] at kOdd
+        rw [← Int.gcd_emod, kOdd]
+        simp
     apply xneo
-    rw [← hx, ← zpow_mod_orderOf, x_z, zpow_zero]
-  | inr x_h =>
-    cases y_cond with
-    | inl y_z =>
-      apply yneo
-      rw [← hy, ← zpow_mod_orderOf, y_z, zpow_zero]
-    | inr y_h =>
-      apply xney
-      rw [← hx, ← hy, ← zpow_mod_orderOf, ← zpow_mod_orderOf _ yn, x_h, y_h]
+    rw [← hx, ← zpow_mod_orderOf, xn_eq_o_mod_k, zpow_zero]
+  · rw [Int.not_odd_iff] at kOdd
+    have half_k_pos : 0 < (k : ℤ) / 2 := by
+      rw [← Int.even_iff] at kOdd
+      rcases kOdd with ⟨y, hy⟩
+      rw [hy, ← Int.two_mul, Int.mul_ediv_cancel_left]
+      · apply (mul_pos_iff_of_pos_left (by change 0 < 2; norm_num)).mp
+        rw [two_mul, ← hy]
+        apply Int.natCast_pos.mpr
+        apply orderOf_pos
+      · norm_num
+  -- We use the auxiliary lemma to get a condition on x and y to operate on later
+    have x_cond : xn % k = 0 ∨ xn % k = k / 2 := by
+      nth_rw 1 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
+      nth_rw 2 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
+      rw [mul_comm _ 2]
+      apply aux
+      · apply half_k_pos
+      · apply EuclideanDomain.mod_eq_zero.mpr
+        rw [← Int.mul_dvd_mul_iff_left (by change 2 ≠ 0; norm_num)]
+        rw [mul_comm, Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
+        apply orderOf_dvd_iff_zpow_eq_one.mpr
+        rw [mul_comm, zpow_mul, hx, xsq]
+    have y_cond : yn % k = 0 ∨ yn % k = k / 2 := by
+      nth_rw 1 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
+      nth_rw 2 [← Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
+      rw [mul_comm _ 2]
+      apply aux
+      · apply half_k_pos
+      · apply EuclideanDomain.mod_eq_zero.mpr
+        rw [← Int.mul_dvd_mul_iff_left (by change 2 ≠ 0; norm_num)]
+        rw [mul_comm, Int.ediv_mul_cancel (Int.dvd_of_emod_eq_zero kOdd)]
+        apply orderOf_dvd_iff_zpow_eq_one.mpr
+        rw [mul_comm, zpow_mul, hy, ysq]
+  -- Final stretch where we arrive at contradictions, by cases on the previous conditions
+    cases x_cond with
+    | inl x_z =>
+      apply xneo
+      rw [← hx, ← zpow_mod_orderOf, x_z, zpow_zero]
+    | inr x_h =>
+      cases y_cond with
+      | inl y_z =>
+        apply yneo
+        rw [← hy, ← zpow_mod_orderOf, y_z, zpow_zero]
+      | inr y_h =>
+        apply xney
+        rw [← hx, ← hy, ← zpow_mod_orderOf, ← zpow_mod_orderOf _ yn, x_h, y_h]
+
+
+-- Special cases
+theorem ZMod_one_cyclic : IsCyclic (ZMod 1)ˣ := by
+  apply isCyclic_iff_exists_natCard_le_orderOf.mpr
+  use 1
+  simp only [Nat.card_eq_fintype_card, Fintype.card_unique, orderOf_one, le_refl]
+
+theorem ZMod_two_cyclic : IsCyclic (ZMod 2)ˣ := by
+  apply isCyclic_iff_exists_natCard_le_orderOf.mpr
+  use 1
+  simp only [Nat.card_eq_fintype_card, ZMod.card_units_eq_totient,
+  Nat.totient_two, orderOf_one, le_refl]
+
+theorem ZMod_four_cyclic : IsCyclic (ZMod 4)ˣ := by
+  apply isCyclic_iff_exists_natCard_le_orderOf.mpr
+  use ⟨3, 3, by decide, by decide⟩
+  have : orderOf (⟨3, 3, by decide, by decide⟩ : (ZMod 4)ˣ) = 2 := by
+    apply orderOf_eq_prime_iff.mpr _
+    exact ⟨by decide, by decide⟩
+  rw [this]
+  simp only [Nat.card_eq_fintype_card, ZMod.card_units_eq_totient, ge_iff_le]
+  decide
+
+
+-- Probably should redo this whole thing
+theorem pow_two_not_cyclic (n : Nat) (hn : 2 < n) : ¬(IsCyclic (ZMod (2 ^ n))ˣ) := by
+  apply two_squares_not_cyclic ⟨2 ^ n - 1, 2 ^ n - 1, sorry, sorry⟩
+      ⟨2 ^ (n - 1), 2 ^ (n - 1) - 1, sorry, sorry⟩
+  · rw [← orderOf_units]
+    apply orderOf_eq_prime_iff.mpr
+    constructor
+    · have : ((2 : ZMod (2^n)) ^ n) = ((2 ^ n) : Nat) := by
+        apply ZMod.toAddCircle_inj.mp
+        simp only [CharP.cast_eq_zero, map_zero, ZMod.toAddCircle_eq_zero]
+        sorry
+      have : ((2 : ZMod (2^n)) ^ n) = 0 := by
+        rw [this]
+        exact ZMod.natCast_self (2 ^ n)
+      rw [this]
+      simp only [zero_sub, even_two, Even.neg_pow, one_pow]
+    · sorry
+  · sorry
+  · sorry
+
+#check isPrimePow_iff_card_primeFactors_eq_one
+
+-- The best way to show the sufficient condition is probably to prove by cases
+-- on the number of prime factors, 0 and 1 this is easy. 2 will be a little harder
+-- what needs to be done is show any number with 2 prime factors is the product
+-- of two prime factors. 3+ should hopefully be easier, all that needs to be done is
+-- at least two of the pfactors are not 2 then find some squares.
+theorem ZMod_cyclic_iff (x : Nat) (xpos : x > 0) : (IsCyclic (ZMod x)ˣ) ↔
+  (∃ p n : Nat, (p.Prime) ∧ (p ≠ 2) ∧ (n > 0) ∧ (x = p ^ n ∨ x = 2 * p ^ n))
+  ∨ (x = 1) ∨ (x = 2) ∨ (x = 4) := by
+    constructor
+    · contrapose!
+      intro ⟨hp, h1, h2, h4⟩
+      rcases Nat.lt_or_ge x.primeFactors.card 2 with hn | hnn
+      · have : x.primeFactors.card = 0 ∨ x.primeFactors.card = 1 := by omega
+        rcases this with (a | b)
+        · have : x = 0 ∨ x = 1 := by
+            apply Nat.primeFactors_eq_empty.mp
+            apply Finset.card_eq_zero.mp a
+          omega
+        · apply isPrimePow_iff_card_primeFactors_eq_one.mpr at b
+          unfold IsPrimePow at b
+          exfalso
+          sorry
+      sorry
+    · intro h
+      rcases h with (xp | x1 | x2 | x4)
+      · rcases xp with ⟨p, n, pPrime, pneqtwo, npos, xeq⟩
+        rcases xeq with xeqp | xeq2p
+        · rw [xeqp]
+          apply @cyclic_prime_power_unit p n pneqtwo npos {out := pPrime}
+        · rw [xeq2p]
+          apply @cyclic_two_prime_power_unit p n {out := pPrime} pneqtwo npos
+      · rw [x1]; exact ZMod_one_cyclic
+      · rw [x2]; exact ZMod_two_cyclic
+      · rw [x4]; exact ZMod_four_cyclic
