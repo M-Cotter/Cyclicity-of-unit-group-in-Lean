@@ -1,7 +1,5 @@
 import Mathlib
 
--- Not computable since we use choice implicitly in some library functions
-
 noncomputable section
 
 /- Bound on the number of solutions to i ^ d = 1 in
